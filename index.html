@@ -29,7 +29,7 @@
       }
 
       video.blur {
-        filter: blur(18px) brightness(0.82) saturate(0.85);
+        filter: blur(20px) brightness(0.85) contrast(1.05) saturate(0.75);
       }
 
       #start {
@@ -153,8 +153,120 @@
           } else {
             await document.exitFullscreen();
           }
-        } catch {}
+        } catch (e) {
+          console.error(e);
+        }
       };
+
+      const hands = new Hands({
+        locateFile: (file) =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/${file}`,
+      });
+
+      hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 0,
+        minDetectionConfidence: 0.55,
+        minTrackingConfidence: 0.55,
+      });
+
+      hands.onResults((results) => {
+        const found = results.multiHandLandmarks || [];
+
+        let peace = 0;
+
+        for (const hand of found) {
+          if (isPeace(hand)) {
+            peace++;
+          }
+        }
+
+        const shouldBlur = found.length >= 2 && peace >= 2;
+
+        setStatus(`hands:${found.length} peace:${peace}`);
+
+        if (shouldBlur) {
+          if (!isBlurred) {
+            video.classList.add("blur");
+            isBlurred = true;
+          }
+
+          if (!audioPlayed) {
+            audioPlayed = true;
+
+            sound.currentTime = 0;
+
+            sound.play().catch(() => {});
+          }
+        } else {
+          if (isBlurred) {
+            video.classList.remove("blur");
+            isBlurred = false;
+          }
+        }
+      });
+
+      async function startCamera() {
+        setStatus("starting camera...");
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "user" },
+
+            width: { ideal: 4096 },
+            height: { ideal: 2160 },
+
+            frameRate: {
+              ideal: 60,
+              max: 60,
+            },
+          },
+          audio: false,
+        });
+
+        const track = stream.getVideoTracks()[0];
+
+        console.log("camera settings:", track.getSettings());
+
+        video.srcObject = stream;
+
+        await new Promise((resolve) => {
+          video.onloadedmetadata = resolve;
+        });
+
+        await video.play();
+
+        start.remove();
+
+        setStatus("ready");
+
+        running = true;
+
+        detectLoop();
+      }
+
+      let lastDetect = 0;
+
+      async function detectLoop() {
+        if (!running) return;
+
+        const now = performance.now();
+
+        if (video.readyState >= 2 && now - lastDetect > 80) {
+          lastDetect = now;
+
+          try {
+            await hands.send({
+              image: video,
+            });
+          } catch (e) {
+            console.error(e);
+            setStatus("hand model error");
+          }
+        }
+
+        requestAnimationFrame(detectLoop);
+      }
 
       start.onclick = async () => {
         try {
