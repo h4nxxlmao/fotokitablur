@@ -1,242 +1,170 @@
 <!doctype html>
 <html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>foto kita blur</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <title>foto kita blur</title>
 
-  <style>
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #000;
-      font-family: Arial, sans-serif;
-    }
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        font-family: Arial, sans-serif;
+      }
 
-    video {
-      width: 100vw;
-      height: 100vh;
-      object-fit: cover;
-      transform: scaleX(-1);
-      transition: filter .18s ease;
-      background: #000;
-    }
+      video {
+        width: 100vw;
+        height: 100vh;
+        object-fit: cover;
+        transform: scaleX(-1);
+        transition: filter 0.18s ease;
+        background: #000;
+      }
 
-    video.blur {
-      filter: blur(18px) brightness(.82) saturate(.85);
-    }
+      video.blur {
+        filter: blur(18px) brightness(0.82) saturate(0.85);
+      }
 
-    #start {
-      position: fixed;
-      inset: 0;
-      z-index: 20;
-      display: grid;
-      place-items: center;
-      background: #000;
-      color: #fff;
-      font-size: 18px;
-      user-select: none;
-    }
+      #start {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: grid;
+        place-items: center;
+        background: #000;
+        color: #fff;
+        font-size: 18px;
+        user-select: none;
+      }
 
-    #watermark {
-      position: fixed;
-      right: 14px;
-      bottom: 12px;
-      z-index: 5;
-      color: white;
-      opacity: .55;
-      font-size: 12px;
-      text-shadow: 0 1px 8px #000;
-    }
+      #watermark {
+        position: fixed;
+        right: 14px;
+        bottom: 12px;
+        z-index: 5;
+        color: white;
+        opacity: 0.55;
+        font-size: 12px;
+        text-shadow: 0 1px 8px #000;
+      }
 
-    #status {
-      position: fixed;
-      left: 14px;
-      bottom: 12px;
-      z-index: 5;
-      color: white;
-      opacity: .65;
-      font-size: 12px;
-      text-shadow: 0 1px 8px #000;
-    }
-  </style>
-</head>
+      #status {
+        position: fixed;
+        left: 14px;
+        bottom: 12px;
+        z-index: 5;
+        color: white;
+        opacity: 0.65;
+        font-size: 12px;
+        text-shadow: 0 1px 8px #000;
+      }
+      #fullscreenBtn {
+        position: fixed;
+        top: 14px;
+        right: 14px;
+        z-index: 10;
 
-<body>
-  <div id="start">tap to start</div>
+        width: 42px;
+        height: 42px;
 
-  <video id="video" autoplay playsinline muted disablepictureinpicture></video>
-  <div id="watermark">hanx.lol</div>
-  <div id="status">loading...</div>
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.4);
 
-  <audio id="sound" src="blur.mp3" preload="auto"></audio>
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js"></script>
+        backdrop-filter: blur(10px);
+      }
+    </style>
+  </head>
 
-  <script>
-    const video = document.getElementById("video");
-    const start = document.getElementById("start");
-    const sound = document.getElementById("sound");
-    const statusEl = document.getElementById("status");
+  <body>
+    <div id="start">tap to start</div>
+    <div id="fullscreenBtn">⛶</div>
+    <video
+      id="video"
+      autoplay
+      playsinline
+      muted
+      disablepictureinpicture
+    ></video>
+    <div id="watermark">hanx.lol</div>
+    <div id="status">loading...</div>
 
-    let locked = false;
-    let lastTrigger = 0;
-    let running = false;
+    <audio id="sound" src="blur.mp3" preload="auto"></audio>
 
-    function setStatus(text) {
-      statusEl.textContent = text;
-    }
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/hands.js"></script>
 
-    function dist(a, b) {
-      return Math.hypot(a.x - b.x, a.y - b.y);
-    }
+    <script>
+      const video = document.getElementById("video");
+      const start = document.getElementById("start");
+      const sound = document.getElementById("sound");
+      const statusEl = document.getElementById("status");
 
-    function fingerUp(lm, tip, pip) {
-      return lm[tip].y < lm[pip].y;
-    }
+      let audioPlayed = false;
+      let running = false;
+      let isBlurred = false;
 
-    function fingerDown(lm, tip, pip) {
-      return lm[tip].y > lm[pip].y;
-    }
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
 
-    function isPeace(lm) {
-      const indexUp = fingerUp(lm, 8, 6);
-      const middleUp = fingerUp(lm, 12, 10);
-      const ringDown = fingerDown(lm, 16, 14);
-      const pinkyDown = fingerDown(lm, 20, 18);
+      function dist(a, b) {
+        return Math.hypot(a.x - b.x, a.y - b.y);
+      }
 
-      const spread = dist(lm[8], lm[12]) > dist(lm[5], lm[9]) * 0.35;
+      function fingerUp(lm, tip, pip) {
+        return lm[tip].y < lm[pip].y;
+      }
 
-      return indexUp && middleUp && ringDown && pinkyDown && spread;
-    }
+      function fingerDown(lm, tip, pip) {
+        return lm[tip].y > lm[pip].y;
+      }
 
-    async function triggerBlur() {
-      const now = Date.now();
-      if (locked || now - lastTrigger < 1800) return;
+      function isPeace(lm) {
+        const indexUp = fingerUp(lm, 8, 6);
+        const middleUp = fingerUp(lm, 12, 10);
 
-      locked = true;
-      lastTrigger = now;
+        const ringDown = fingerDown(lm, 16, 14);
+        const pinkyDown = fingerDown(lm, 20, 18);
 
-      video.classList.add("blur");
-      setStatus("blur ✌️");
+        const spread = dist(lm[8], lm[12]) > dist(lm[5], lm[9]) * 0.35;
 
-      try {
-        sound.pause();
-        sound.currentTime = 0;
-        await sound.play();
-      } catch (e) {
-        console.log("audio error", e);
+        return indexUp && middleUp && ringDown && pinkyDown && spread;
       }
 
       sound.onended = () => {
-        video.classList.remove("blur");
-        locked = false;
-        setStatus("ready");
+        audioPlayed = false;
       };
 
-      setTimeout(() => {
-        if (sound.paused || sound.ended) {
-          video.classList.remove("blur");
-          locked = false;
-          setStatus("ready");
-        }
-      }, 12000);
-    }
-
-    const hands = new Hands({
-      locateFile: (file) => {
-        return "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4/" + file;
-      }
-    });
-
-    hands.setOptions({
-      maxNumHands: 2,
-      modelComplexity: 0,
-      minDetectionConfidence: 0.55,
-      minTrackingConfidence: 0.55
-    });
-
-    hands.onResults((results) => {
-      const found = results.multiHandLandmarks || [];
-
-      if (found.length === 0) {
-        setStatus("show 2 peace signs");
-        return;
-      }
-
-      let peace = 0;
-
-      for (const hand of found) {
-        if (isPeace(hand)) peace++;
-      }
-
-      setStatus(`hands: ${found.length} | peace: ${peace}`);
-
-      if (found.length >= 2 && peace >= 2) {
-        triggerBlur();
-      }
-    });
-
-    async function startCamera() {
-      setStatus("starting camera...");
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "user" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 }
-        },
-        audio: false
-      });
-
-      video.srcObject = stream;
-
-      await new Promise((resolve) => {
-        video.onloadedmetadata = resolve;
-      });
-
-      await video.play();
-
-      start.remove();
-      setStatus("loading hand model...");
-
-      running = true;
-      detectLoop();
-    }
-
-    let lastDetect = 0;
-
-    async function detectLoop() {
-      if (!running) return;
-
-      const now = performance.now();
-
-      if (video.readyState >= 2 && now - lastDetect > 120) {
-        lastDetect = now;
-
+      document.getElementById("fullscreenBtn").onclick = async () => {
         try {
-          await hands.send({ image: video });
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          } else {
+            await document.exitFullscreen();
+          }
+        } catch {}
+      };
+
+      start.onclick = async () => {
+        try {
+          await startCamera();
         } catch (e) {
+          alert(e.message);
           console.error(e);
-          setStatus("hand model error");
+          setStatus("camera error");
         }
-      }
-
-      requestAnimationFrame(detectLoop);
-    }
-
-    start.onclick = async () => {
-      try {
-        await startCamera();
-      } catch (e) {
-        alert(e.message);
-        console.error(e);
-        setStatus("camera error");
-      }
-    };
-  </script>
-</body>
+      };
+    </script>
+  </body>
 </html>
