@@ -126,8 +126,6 @@
         return Math.hypot(a.x - b.x, a.y - b.y);
       }
 
-      // This is based on joint geometry, not screen direction. It works when a
-      // hand is upright, rotated, upside down, or mirrored by the front camera.
       function angle(a, b, c) {
         const abx = a.x - b.x;
         const aby = a.y - b.y;
@@ -175,7 +173,6 @@
       }
 
       sound.onended = () => {
-        // A later peace-sign detection may start the sound from the beginning.
         audioPlayed = false;
       };
 
