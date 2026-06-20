@@ -214,11 +214,9 @@
         const shouldBlur = found.length >= 2 && peace >= 2;
         setStatus(`hands:${found.length} peace:${peace}`);
 
-        // Apply and remove blur directly from the latest completed detection.
         video.classList.toggle("blur", shouldBlur);
         isBlurred = shouldBlur;
 
-        // Never interrupt playback. The onended handler unlocks the next start.
         if (shouldBlur && !audioPlayed) {
           audioPlayed = true;
           sound.currentTime = 0;
@@ -258,7 +256,6 @@
       async function detectLoop() {
         if (!running) return;
 
-        // Do not queue inference jobs: start a new one as soon as the prior frame finishes.
         if (video.readyState >= 2 && !detecting) {
           detecting = true;
           try {
