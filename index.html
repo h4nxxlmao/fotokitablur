@@ -126,24 +126,52 @@
         return Math.hypot(a.x - b.x, a.y - b.y);
       }
 
-      function fingerUp(lm, tip, pip) {
-        return lm[tip].y < lm[pip].y;
+      // This is based on joint geometry, not screen direction. It works when a
+      // hand is upright, rotated, upside down, or mirrored by the front camera.
+      function angle(a, b, c) {
+        const abx = a.x - b.x;
+        const aby = a.y - b.y;
+        const abz = a.z - b.z;
+        const cbx = c.x - b.x;
+        const cby = c.y - b.y;
+        const cbz = c.z - b.z;
+        const denominator =
+          Math.hypot(abx, aby, abz) * Math.hypot(cbx, cby, cbz);
+        if (!denominator) return 0;
+        const cosine = (abx * cbx + aby * cby + abz * cbz) / denominator;
+        return (Math.acos(Math.max(-1, Math.min(1, cosine))) * 180) / Math.PI;
       }
 
-      function fingerDown(lm, tip, pip) {
-        return lm[tip].y > lm[pip].y;
+      function fingerExtended(lm, mcp, pip, dip, tip) {
+        return (
+          angle(lm[mcp], lm[pip], lm[dip]) > 155 &&
+          angle(lm[pip], lm[dip], lm[tip]) > 145 &&
+          dist(lm[tip], lm[0]) > dist(lm[pip], lm[0]) * 1.15
+        );
+      }
+
+      function fingerCurled(lm, mcp, pip, dip, tip) {
+        const pipBent = angle(lm[mcp], lm[pip], lm[dip]) < 135;
+        const tipNearBase =
+          dist(lm[tip], lm[mcp]) < dist(lm[pip], lm[mcp]) * 1.35;
+        return pipBent || tipNearBase;
       }
 
       function isPeace(lm) {
-        const indexUp = fingerUp(lm, 8, 6);
-        const middleUp = fingerUp(lm, 12, 10);
+        const indexExtended = fingerExtended(lm, 5, 6, 7, 8);
+        const middleExtended = fingerExtended(lm, 9, 10, 11, 12);
+        const ringCurled = fingerCurled(lm, 13, 14, 15, 16);
+        const pinkyCurled = fingerCurled(lm, 17, 18, 19, 20);
+        const palmWidth = dist(lm[5], lm[17]);
+        const fingersApart = dist(lm[8], lm[12]) > palmWidth * 0.32;
 
-        const ringDown = fingerDown(lm, 16, 14);
-        const pinkyDown = fingerDown(lm, 20, 18);
-
-        const spread = dist(lm[8], lm[12]) > dist(lm[5], lm[9]) * 0.35;
-
-        return indexUp && middleUp && ringDown && pinkyDown && spread;
+        return (
+          indexExtended &&
+          middleExtended &&
+          ringCurled &&
+          pinkyCurled &&
+          fingersApart
+        );
       }
 
       sound.onended = () => {
@@ -170,9 +198,9 @@
 
       hands.setOptions({
         maxNumHands: 2,
-        modelComplexity: 0,
-        minDetectionConfidence: 0.55,
-        minTrackingConfidence: 0.55,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6,
       });
 
       hands.onResults((results) => {
